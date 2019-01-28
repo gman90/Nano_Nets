@@ -1,7 +1,7 @@
 from flask import Flask, request, flash, abort, jsonify
 from config import img_base_path
 from model import Model,ModelCache
-from db import create_db,fetch_best_params
+from db import create_db,fetch_best_params,db_get_experiments
 from rq import Queue
 from redis import from_url
 import os
@@ -22,7 +22,7 @@ def create_model():
         i = data.get("i", None)
         j = data.get("j", None)
         k = data.get("k", None)
-    model = Model(i, j, k)
+    model = Model(i=i, j=j, k=k)
     model.write_model_to_db()
     model_cache.put(model.id, model)
 
@@ -82,8 +82,9 @@ def fetch_best():
         abort(404)
     result = fetch_best_params(model_id)
     try:
-        Job.is_finished(str(model_id), redis_conn)
-        result["status_message"] = "Some experiments are still running for this model. Hence this result may change" \
+        print(result)
+        if not Job.fetch(str(model_id), redis_conn).is_finished:
+            result["status_message"] = "Some experiments are still running for this model. Hence this result may change" \
                                    "Try again after sometime for more up to date results"
     except :
         print("No such Job")
@@ -99,6 +100,8 @@ def upload_file():
         model_id = request.args.get("model_id")
         if model_id is None:
             abort(404)
+        if model_cache.get(model_id) is None:
+            abort(404)
         if 'file' not in request.files:
             flash('No file part')
             return "no image found"
@@ -109,7 +112,19 @@ def upload_file():
                 os.makedirs(upload_path)
             file.save(os.path.join(upload_path,file.filename))
 
-        return "success"
+        return jsonify({"status_message": "Experiment queued"})
+
+@app.route('/models/experiments', methods=['POST'])
+def get_experiments():
+    if request.method == 'POST':
+        model_id = request.args.get("model_id")
+        if model_id is None:
+            abort(404)
+        if model_cache.get(model_id) is None:
+            abort(404)
+        db_get_experiments(model_id)
+
+        return jsonify(db_get_experiments(model_id))
 
 
 if __name__ == '__main__':

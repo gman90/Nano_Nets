@@ -3,7 +3,7 @@ from config import img_base_path,model_cache_size
 from db import create_model,get_model
 
 class Model:
-    def __init__(self, db_conn, id =None, i=None, j=None, k=None):
+    def __init__(self,id =None, i=None, j=None, k=None):
         if id is None:
             self.id = uuid.uuid4()
         if i is None:
@@ -21,7 +21,6 @@ class Model:
         else:
             self.k = k
         self.training_images_loc = img_base_path + "/" + "/" + str(self.id)
-        self.db_conn = db_conn
 
     def generate_experiments(self, i=None, j=None, k=None):
         if i is not None:
